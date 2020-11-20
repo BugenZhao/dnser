@@ -77,7 +77,7 @@ impl DnsPacketBuf {
 
         let mut labels = Vec::new();
         while self.peek_u8(self.pos)? != 0x00 {
-            labels.push(self.read_label(0)?);
+            labels.push(self.read_label(depth + 1)?);
         }
         self.read_u8();
         Some(labels.join("."))
@@ -88,25 +88,30 @@ impl DnsPacketBuf {
     }
 }
 
+impl DnsPacketBuf {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        use std::io::Read;
+
+        let mut cursor = std::io::Cursor::new(bytes);
+        let mut buf = DnsPacketBuf::new();
+        cursor.read(&mut buf.buf).unwrap();
+        buf
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs::File;
-    use std::io::Read;
+
+    macro_rules! buf {
+        ($path:literal) => {
+            DnsPacketBuf::from_bytes(include_bytes!($path))
+        };
+    }
 
     lazy_static! {
-        static ref RESPONSE_BUF: DnsPacketBuf = {
-            let bytes = include_bytes!("../res/response.bin");
-            let mut cursor = std::io::Cursor::new(bytes);
-            let mut buf = DnsPacketBuf::new();
-            cursor.read(&mut buf.buf).unwrap();
-            buf
-
-            // let mut file = File::open("res/response.bin").unwrap();
-            // let mut buf = DnsPacketBuf::new();
-            // file.read(&mut buf.buf).unwrap();
-            // buf
-        };
+        static ref RESPONSE_BUF: DnsPacketBuf = buf!("../res/response.bin");
+        static ref BUGGY_BUF: DnsPacketBuf = buf!("../res/buggy_jump.bin");
     }
 
     static NAME: &str = "416.bugen.dev";
@@ -127,5 +132,13 @@ mod test {
         buf.pos = origin_pos;
         assert_eq!(buf.read_name().unwrap(), NAME);
         assert_eq!(buf.pos, origin_pos + 2 + 1);
+    }
+
+    #[test]
+    fn test_read_name_with_buggy_jump() {
+        let mut buf = BUGGY_BUF.clone();
+        let origin_pos = 0x1f;
+        buf.pos = origin_pos;
+        assert_eq!(buf.read_name(), None);
     }
 }
