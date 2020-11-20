@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 hex = "*"
-lazy_static = "1.4.0"
+lazy_static = "*"
+thiserror = "*"

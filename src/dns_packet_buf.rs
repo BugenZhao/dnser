@@ -1,3 +1,5 @@
+use crate::error::{Error, Result};
+
 #[derive(Clone)]
 pub struct DnsPacketBuf {
     pub buf: [u8; 512],
@@ -22,36 +24,39 @@ impl DnsPacketBuf {
         self.pos = pos;
     }
 
-    fn peek_u8(&mut self, pos: usize) -> Option<u8> {
-        let r = *self.buf.get(pos)?;
-        Some(r)
-    }
-
-    fn peek_range(&mut self, start: usize, len: usize) -> Option<&[u8]> {
-        if start + len >= 512 {
-            None
+    fn peek_u8(&mut self, pos: usize) -> Result<u8> {
+        if pos >= 512 {
+            Err(Error::EndOfBuffer(pos).into())
         } else {
-            Some(&self.buf[start..start + len])
+            Ok(self.buf[pos])
         }
     }
 
-    fn read_u8(&mut self) -> Option<u8> {
+    fn peek_range(&mut self, start: usize, len: usize) -> Result<&[u8]> {
+        if start + len >= 512 {
+            Err(Error::EndOfBuffer(start + len).into())
+        } else {
+            Ok(&self.buf[start..start + len])
+        }
+    }
+
+    fn read_u8(&mut self) -> Result<u8> {
         let r = self.peek_u8(self.pos)?;
         self.pos += 1;
-        Some(r)
+        Ok(r)
     }
 
-    fn read_u16(&mut self) -> Option<u16> {
-        Some(((self.read_u8()? as u16) << 8) | (self.read_u8()? as u16))
+    fn read_u16(&mut self) -> Result<u16> {
+        Ok(((self.read_u8()? as u16) << 8) | (self.read_u8()? as u16))
     }
 
-    fn read_u32(&mut self) -> Option<u32> {
-        Some(((self.read_u16()? as u32) << 16) | (self.read_u16()? as u32))
+    fn read_u32(&mut self) -> Result<u32> {
+        Ok(((self.read_u16()? as u32) << 16) | (self.read_u16()? as u32))
     }
 }
 
 impl DnsPacketBuf {
-    fn read_label(&mut self, depth: u8) -> Option<String> {
+    fn read_label(&mut self, depth: u8) -> Result<String> {
         let src_pos = self.pos;
         let len = self.read_u8()?;
 
@@ -66,24 +71,24 @@ impl DnsPacketBuf {
             let label_bytes = self.peek_range(self.pos, len as usize)?;
             let r = String::from_utf8_lossy(label_bytes).into_owned();
             self.seek(src_pos + 1 + len as usize);
-            Some(r)
+            Ok(r)
         }
     }
 
-    fn read_name_worker(&mut self, depth: u8) -> Option<String> {
+    fn read_name_worker(&mut self, depth: u8) -> Result<String> {
         if depth >= 5 {
-            return None;
+            return Err(Error::TooManyJumps(self.pos).into());
         }
 
         let mut labels = Vec::new();
         while self.peek_u8(self.pos)? != 0x00 {
             labels.push(self.read_label(depth + 1)?);
         }
-        self.read_u8();
-        Some(labels.join("."))
+        self.read_u8().unwrap();
+        Ok(labels.join("."))
     }
 
-    fn read_name(&mut self) -> Option<String> {
+    fn read_name(&mut self) -> Result<String> {
         self.read_name_worker(0)
     }
 }
@@ -139,6 +144,6 @@ mod test {
         let mut buf = BUGGY_BUF.clone();
         let origin_pos = 0x1f;
         buf.pos = origin_pos;
-        assert_eq!(buf.read_name(), None);
+        buf.read_name().unwrap_err();
     }
 }

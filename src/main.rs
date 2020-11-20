@@ -1,9 +1,11 @@
 #![allow(dead_code)]
+// #![feature(box_patterns)]
 
 #[cfg_attr(test, macro_use)]
 extern crate lazy_static;
 
-pub mod dns_packet_buf;
+mod dns_packet_buf;
+mod error;
 
 fn main() {
     println!("Hello, world!");
