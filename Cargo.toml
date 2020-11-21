@@ -15,4 +15,4 @@ num-derive = "0.3"
 rand = "*"
 structopt = "*"
 clap = "*"
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "0.3", features = ["full"] }
