@@ -5,6 +5,8 @@ extern crate lazy_static;
 #[cfg_attr(dns_packet, macro_use)]
 extern crate num_derive;
 
+extern crate tokio;
+
 mod client;
 mod dns_packet;
 mod dns_packet_buf;
@@ -26,8 +28,8 @@ struct Opt {
     r#type: QueryType,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opt: Opt = Opt::from_args();
-    // client::lookup(&opt.domain, opt.r#type, &opt.server).unwrap();
-    server::run(&opt.server, 55553).unwrap();
+    server::run(&opt.server, 55553).await.unwrap();
 }
