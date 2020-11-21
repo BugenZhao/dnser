@@ -392,6 +392,7 @@ mod test {
         static ref RESPONSE_BUF: DnsPacketBuf = buf!("../res/response.bin");
         static ref QUERY_BUF: DnsPacketBuf = buf!("../res/query.bin");
         static ref BUGGY_BUF: DnsPacketBuf = buf!("../res/buggy_jump.bin");
+        static ref RESPONSE_NS_BUF: DnsPacketBuf = buf!("../res/response_ns.bin");
     }
 
     #[test]
@@ -490,5 +491,23 @@ mod test {
         println!("{:#?}", packet_parsed);
 
         assert_eq!(packet_parsed.questions.first().unwrap().name, DOMAIN);
+    }
+
+    #[test]
+    fn test_write_response_ns_packet() {
+        let mut buf: DnsPacketBuf = RESPONSE_NS_BUF.clone();
+        let packet = DnsPacket::read_from(&mut buf).unwrap();
+
+        let mut write_buf = DnsPacketBuf::new();
+        packet.write(&mut write_buf).unwrap();
+        write_buf.seek(0);
+
+        let read_back_packet = DnsPacket::read_from(&mut write_buf).unwrap();
+        println!("{:#?}", read_back_packet);
+
+        assert!(match read_back_packet.answers.first() {
+            Some(DnsRecord::NS { host, .. }) => host == "ns2.google.com",
+            _ => false,
+        });
     }
 }
