@@ -56,7 +56,7 @@ impl DnsPacketBuf {
 }
 
 impl DnsPacketBuf {
-    fn read_label(&mut self, depth: u8) -> Result<String> {
+    fn read_label(&mut self, depth: u8) -> Result<(String, bool)> {
         let src_pos = self.pos;
         let len = self.read_u8()?;
 
@@ -65,13 +65,20 @@ impl DnsPacketBuf {
             let jump_to = (((len ^ 0xc0) as usize) << 8) | (b2 as usize);
             self.seek(jump_to);
             let r = self.read_name_worker(depth + 1);
-            self.seek(src_pos + 2);
-            r
+
+            match r {
+                Ok(name) => {
+                    self.seek(src_pos + 2);
+                    Ok((name, true))
+                }
+                Err(e) => Err(e),
+            }
         } else {
             let label_bytes = self.peek_range(self.pos, len as usize)?;
             let r = String::from_utf8_lossy(label_bytes).into_owned();
             self.seek(src_pos + 1 + len as usize);
-            Ok(r)
+
+            Ok((r, false))
         }
     }
 
@@ -81,10 +88,17 @@ impl DnsPacketBuf {
         }
 
         let mut labels = Vec::new();
+        let mut jumped = false;
         while self.peek_u8(self.pos)? != 0x00 {
-            labels.push(self.read_label(depth + 1)?);
+            let (label, this_jumped) = self.read_label(depth)?;
+            labels.push(label);
+            jumped = jumped || this_jumped;
         }
-        self.read_u8().unwrap();
+
+        if !jumped {
+            let _ = self.read_u8()?;
+        }
+
         Ok(labels.join("."))
     }
 
@@ -131,7 +145,7 @@ mod test {
         let origin_pos = 0x1f;
         buf.pos = origin_pos;
         assert_eq!(buf.read_name().unwrap(), NAME);
-        assert_eq!(buf.pos, origin_pos + 2 + 1);
+        assert_eq!(buf.pos, origin_pos + 2);
     }
 
     #[test]
