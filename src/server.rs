@@ -58,12 +58,11 @@ pub async fn run(forward_server: &str, port: u16) -> Result<()> {
     let mut server_socket = UdpSocket::bind(("0.0.0.0", port)).await?;
     println!("Running on :{}", port);
     loop {
-        handle_query(&mut server_socket, forward_server).await;
-        // match handle_query(&mut server_socket, forward_server).await {
-        //     Ok(_) => {}
-        //     Err(e) => {
-        //         println!("error {}", e);
-        //     }
-        // };
+        match handle_query(&mut server_socket, forward_server).await {
+            Ok(_) => {}
+            Err(e) => {
+                println!("error {}", e);
+            }
+        };
     }
 }
