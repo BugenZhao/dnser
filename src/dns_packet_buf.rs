@@ -89,7 +89,7 @@ impl DnsPacketBuf {
 
         let mut labels = Vec::new();
         let mut jumped = false;
-        while self.peek_u8(self.pos)? != 0x00 {
+        while self.peek_u8(self.pos)? != 0x00 && !jumped {
             let (label, this_jumped) = self.read_label(depth)?;
             labels.push(label);
             jumped = jumped || this_jumped;
