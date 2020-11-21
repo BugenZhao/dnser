@@ -10,5 +10,5 @@ A DNS utility written in Rust, just for learning the networking & the rust-lang.
 - [ ] DNS server
     - [x] proxy
     - [ ] recursive resolver
-- [ ] Concurrency
-    - [ ] async
+- [x] Concurrency
+    - [x] async

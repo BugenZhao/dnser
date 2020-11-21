@@ -73,9 +73,9 @@ async fn prepare_query(socket: Arc<UdpSocket>, forward_server: Arc<String>) -> R
     Ok(())
 }
 
-pub async fn run(forward_server: &str, port: u16) -> Result<()> {
+pub async fn run(forward_server: String, port: u16) -> Result<()> {
     let server_socket = Arc::new(UdpSocket::bind(("0.0.0.0", port)).await?);
-    let forward_server = Arc::new(forward_server.to_owned());
+    let forward_server = Arc::new(forward_server);
     println!("Running on :{}", port);
     loop {
         match prepare_query(server_socket.clone(), forward_server.clone()).await {
