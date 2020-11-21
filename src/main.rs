@@ -21,12 +21,12 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "dnser", about = "A DNS utility by Bugen.")]
 enum Dnser {
-    Client {
+    Lookup {
         #[structopt(short, long, default_value = "223.5.5.5:53")]
         server: String,
         #[structopt(short, long, possible_values = &QueryType::variants(), case_insensitive = true, default_value = "A")]
         r#type: QueryType,
-        #[structopt(default_value = "bugen.dev")]
+        #[structopt()]
         domain: String,
     },
     Server {
@@ -45,7 +45,7 @@ enum Dnser {
 #[tokio::main]
 async fn main() {
     match Dnser::from_args() {
-        Dnser::Client {
+        Dnser::Lookup {
             server,
             r#type,
             domain,
