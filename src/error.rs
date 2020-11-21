@@ -1,6 +1,6 @@
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
 use thiserror::Error;
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -8,4 +8,6 @@ pub enum Error {
     EndOfBuffer(usize),
     #[error("too many jumps at {0}")]
     TooManyJumps(usize),
+    #[error("invalid result code `{0}`")]
+    InvalidResultCode(u8),
 }

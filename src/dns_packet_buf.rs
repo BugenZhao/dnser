@@ -24,7 +24,7 @@ impl DnsPacketBuf {
         self.pos = pos;
     }
 
-    fn peek_u8(&mut self, pos: usize) -> Result<u8> {
+    pub fn peek_u8(&mut self, pos: usize) -> Result<u8> {
         if pos >= 512 {
             Err(Error::EndOfBuffer(pos).into())
         } else {
@@ -32,7 +32,7 @@ impl DnsPacketBuf {
         }
     }
 
-    fn peek_range(&mut self, start: usize, len: usize) -> Result<&[u8]> {
+    pub fn peek_range(&mut self, start: usize, len: usize) -> Result<&[u8]> {
         if start + len >= 512 {
             Err(Error::EndOfBuffer(start + len).into())
         } else {
@@ -40,17 +40,17 @@ impl DnsPacketBuf {
         }
     }
 
-    fn read_u8(&mut self) -> Result<u8> {
+    pub fn read_u8(&mut self) -> Result<u8> {
         let r = self.peek_u8(self.pos)?;
         self.pos += 1;
         Ok(r)
     }
 
-    fn read_u16(&mut self) -> Result<u16> {
+    pub fn read_u16(&mut self) -> Result<u16> {
         Ok(((self.read_u8()? as u16) << 8) | (self.read_u8()? as u16))
     }
 
-    fn read_u32(&mut self) -> Result<u32> {
+    pub fn read_u32(&mut self) -> Result<u32> {
         Ok(((self.read_u16()? as u32) << 16) | (self.read_u16()? as u32))
     }
 }
@@ -88,13 +88,13 @@ impl DnsPacketBuf {
         Ok(labels.join("."))
     }
 
-    fn read_name(&mut self) -> Result<String> {
+    pub fn read_name(&mut self) -> Result<String> {
         self.read_name_worker(0)
     }
 }
 
 impl DnsPacketBuf {
-    fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         use std::io::Read;
 
         let mut cursor = std::io::Cursor::new(bytes);
@@ -107,12 +107,7 @@ impl DnsPacketBuf {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    macro_rules! buf {
-        ($path:literal) => {
-            DnsPacketBuf::from_bytes(include_bytes!($path))
-        };
-    }
+    use crate::buf;
 
     lazy_static! {
         static ref RESPONSE_BUF: DnsPacketBuf = buf!("../res/response.bin");
@@ -141,9 +136,12 @@ mod test {
 
     #[test]
     fn test_read_name_with_buggy_jump() {
-        let mut buf = BUGGY_BUF.clone();
+        let mut buf: DnsPacketBuf = BUGGY_BUF.clone();
         let origin_pos = 0x1f;
         buf.pos = origin_pos;
-        buf.read_name().unwrap_err();
+        assert!(match buf.read_name().unwrap_err() {
+            Error::TooManyJumps(_) => true,
+            _ => false,
+        })
     }
 }
