@@ -14,4 +14,6 @@ pub enum Error {
     InvalidQueryType(u16),
     #[error("unimplemented query type `{0:?}`")]
     UnimplementedQueryType(crate::dns_packet::QueryType),
+    #[error("label `{0}` exceeds the length limitation")]
+    LabelLengthExceeded(String),
 }

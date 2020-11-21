@@ -16,11 +16,11 @@ impl DnsPacketBuf {
 }
 
 impl DnsPacketBuf {
-    fn step(&mut self, n: usize) {
+    pub fn step(&mut self, n: usize) {
         self.pos += n;
     }
 
-    fn seek(&mut self, pos: usize) {
+    pub fn seek(&mut self, pos: usize) {
         self.pos = pos;
     }
 
@@ -39,7 +39,9 @@ impl DnsPacketBuf {
             Ok(&self.buf[start..start + len])
         }
     }
+}
 
+impl DnsPacketBuf {
     pub fn read_u8(&mut self) -> Result<u8> {
         let r = self.peek_u8(self.pos)?;
         self.pos += 1;
@@ -53,9 +55,7 @@ impl DnsPacketBuf {
     pub fn read_u32(&mut self) -> Result<u32> {
         Ok(((self.read_u16()? as u32) << 16) | (self.read_u16()? as u32))
     }
-}
 
-impl DnsPacketBuf {
     fn read_label(&mut self, depth: u8) -> Result<(String, bool)> {
         let src_pos = self.pos;
         let len = self.read_u8()?;
@@ -104,6 +104,44 @@ impl DnsPacketBuf {
 
     pub fn read_name(&mut self) -> Result<String> {
         self.read_name_worker(0)
+    }
+}
+
+impl DnsPacketBuf {
+    pub fn write_u8(&mut self, v: u8) -> Result<()> {
+        if self.pos >= 512 {
+            return Err(Error::EndOfBuffer(self.pos));
+        }
+        self.buf[self.pos] = v;
+        self.pos += 1;
+        Ok(())
+    }
+
+    pub fn write_u16(&mut self, v: u16) -> Result<()> {
+        self.write_u8((v >> 8) as u8)?;
+        self.write_u8(v as u8)?;
+        Ok(())
+    }
+
+    pub fn write_u32(&mut self, v: u32) -> Result<()> {
+        self.write_u16((v >> 16) as u16)?;
+        self.write_u16(v as u16)?;
+        Ok(())
+    }
+
+    pub fn write_name_simple(&mut self, name: &str) -> Result<()> {
+        for label in name.split(".") {
+            let len = label.len();
+            if len > 0b0011_1111 {
+                return Err(Error::LabelLengthExceeded(label.into()));
+            }
+            self.write_u8(len as u8)?;
+            for &b in label.as_bytes() {
+                self.write_u8(b)?;
+            }
+        }
+        self.write_u8(0)?;
+        Ok(())
     }
 }
 

@@ -1,8 +1,8 @@
 use std::net::Ipv4Addr;
 
 use crate::error::{Error, Result};
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::dns_packet_buf::DnsPacketBuf;
 
@@ -40,7 +40,11 @@ pub struct DnsHeader {
 
 impl Default for DnsHeader {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        Self {
+            recursion_desired: true,
+            authed_data: true,
+            ..unsafe { std::mem::zeroed() }
+        }
     }
 }
 
@@ -72,6 +76,30 @@ impl DnsHeader {
         // Return the constant header size
         Ok(h)
     }
+
+    pub fn write(&self, buf: &mut DnsPacketBuf) -> Result<()> {
+        buf.write_u16(self.id)?;
+        buf.write_u8(
+            (self.recursion_desired as u8)
+                | ((self.truncated_message as u8) << 1)
+                | ((self.authoritative_answer as u8) << 2)
+                | (self.opcode << 3)
+                | ((self.response as u8) << 7) as u8,
+        )?;
+        buf.write_u8(
+            (self.rescode as u8)
+                | ((self.checking_disabled as u8) << 4)
+                | ((self.authed_data as u8) << 5)
+                | ((self.z as u8) << 6)
+                | ((self.recursion_available as u8) << 7),
+        )?;
+        buf.write_u16(self.questions)?;
+        buf.write_u16(self.answers)?;
+        buf.write_u16(self.authoritative_entries)?;
+        buf.write_u16(self.resource_entries)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
@@ -94,6 +122,13 @@ impl DnsQuestion {
         let _class = buf.read_u16()?;
         Ok(DnsQuestion { name, query_type })
     }
+
+    pub fn write(&self, buf: &mut DnsPacketBuf) -> Result<()> {
+        buf.write_name_simple(&self.name)?;
+        buf.write_u16(self.query_type.to_u16().unwrap())?;
+        buf.write_u16(1)?; // class
+        Ok(())
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -111,7 +146,7 @@ impl DnsRecord {
         let query_type_num = buf.read_u16()?;
         let query_type =
             QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
-        let _ = buf.read_u16()?;
+        let _class = buf.read_u16()?;
         let ttl = buf.read_u32()?;
         let _data_len = buf.read_u16()?;
 
@@ -128,6 +163,28 @@ impl DnsRecord {
                 Ok(DnsRecord::A { name, addr, ttl })
             }
             _ => Err(Error::UnimplementedQueryType(query_type)),
+        }
+    }
+
+    pub fn write(&self, buf: &mut DnsPacketBuf) -> Result<()> {
+        match *self {
+            DnsRecord::A {
+                ref name,
+                ref addr,
+                ttl,
+            } => {
+                buf.write_name_simple(name)?;
+                buf.write_u16(QueryType::A.to_u16().unwrap())?;
+                buf.write_u16(1)?; // class
+                buf.write_u32(ttl)?;
+                buf.write_u16(4)?; // data_len
+
+                for &o in &addr.octets() {
+                    buf.write_u8(o)?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -164,6 +221,48 @@ impl DnsPacket {
             authorities,
             resources,
         })
+    }
+
+    pub fn write(&self, buf: &mut DnsPacketBuf) -> Result<()> {
+        self.header.write(buf)?;
+        for q in &self.questions {
+            q.write(buf)?;
+        }
+        for r in &self.answers {
+            r.write(buf)?;
+        }
+        for r in &self.authorities {
+            r.write(buf)?;
+        }
+        for r in &self.resources {
+            r.write(buf)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl DnsPacket {
+    pub fn example(domain: &str) -> Self {
+        use rand::Rng;
+
+        let header = DnsHeader {
+            id: rand::thread_rng().gen_range(10000, u16::MAX),
+            questions: 1,
+            ..DnsHeader::default()
+        };
+        let questions = vec![DnsQuestion {
+            name: domain.into(),
+            query_type: QueryType::A,
+        }];
+
+        Self {
+            header,
+            questions,
+            answers: vec![],
+            authorities: vec![],
+            resources: vec![],
+        }
     }
 }
 
@@ -259,5 +358,20 @@ mod test {
             Error::TooManyJumps(_) => true,
             _ => false,
         })
+    }
+
+    #[test]
+    fn test_write_query_packet() {
+        const DOMAIN: &str = "bugenzhao.com";
+
+        let packet = DnsPacket::example(DOMAIN);
+        let mut buf = DnsPacketBuf::new();
+        packet.write(&mut buf).unwrap();
+
+        buf.seek(0);
+        let packet_parsed = DnsPacket::read_from(&mut buf).unwrap();
+        println!("{:#?}", packet_parsed);
+
+        assert_eq!(packet_parsed.questions.first().unwrap().name, DOMAIN);
     }
 }
