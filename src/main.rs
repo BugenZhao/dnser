@@ -29,7 +29,7 @@ fn main() {
     let socket = UdpSocket::bind(("0.0.0.0", 0)).unwrap();
     socket.connect(&opt.server).unwrap();
 
-    let packet = DnsPacket::example(&opt.domain);
+    let packet = DnsPacket::example(&opt.domain, dns_packet::QueryType::NS);
     let mut send_buf = DnsPacketBuf::new();
     packet.write(&mut send_buf).unwrap();
     socket.send(&send_buf.buf[0..send_buf.pos]).unwrap();

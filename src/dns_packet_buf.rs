@@ -108,6 +108,17 @@ impl DnsPacketBuf {
 }
 
 impl DnsPacketBuf {
+    pub fn set_u8(&mut self, pos: usize, v: u8) -> Result<()> {
+        self.buf[pos] = v;
+        Ok(())
+    }
+
+    pub fn set_u16(&mut self, pos: usize, v: u16) -> Result<()> {
+        self.set_u8(pos, (v >> 8) as u8)?;
+        self.set_u8(pos, (v & 0xff) as u8)?;
+        Ok(())
+    }
+
     pub fn write_u8(&mut self, v: u8) -> Result<()> {
         if self.pos >= 512 {
             return Err(Error::EndOfBuffer(self.pos));

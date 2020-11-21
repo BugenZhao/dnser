@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use crate::error::{Error, Result};
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -106,6 +106,9 @@ impl DnsHeader {
 pub enum QueryType {
     Unknown = 0,
     A = 1,
+    NS = 2,
+    CNAME = 5,
+    AAAA = 28,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -136,14 +139,29 @@ impl DnsQuestion {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum DnsRecord {
     Unknown {
+        query_type_num: u16,
         name: String,
-        query_type: QueryType,
         data_len: u16,
         ttl: u32,
     },
     A {
         name: String,
         addr: Ipv4Addr,
+        ttl: u32,
+    },
+    NS {
+        name: String,
+        host: String,
+        ttl: u32,
+    },
+    CNAME {
+        name: String,
+        host: String,
+        ttl: u32,
+    },
+    AAAA {
+        name: String,
+        addr: Ipv6Addr,
         ttl: u32,
     },
 }
@@ -171,12 +189,36 @@ impl DnsRecord {
 
                 Ok(DnsRecord::A { name, addr, ttl })
             }
+            QueryType::NS => {
+                let host = buf.read_name()?;
+
+                Ok(DnsRecord::NS { name, host, ttl })
+            }
+            QueryType::CNAME => {
+                let host = buf.read_name()?;
+
+                Ok(DnsRecord::CNAME { name, host, ttl })
+            }
+            QueryType::AAAA => {
+                let addr = Ipv6Addr::new(
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                    buf.read_u16()?,
+                );
+
+                Ok(DnsRecord::AAAA { name, addr, ttl })
+            }
             QueryType::Unknown => {
                 buf.step(data_len as usize);
 
                 Ok(DnsRecord::Unknown {
+                    query_type_num,
                     name,
-                    query_type,
                     data_len,
                     ttl,
                 })
@@ -186,6 +228,17 @@ impl DnsRecord {
     }
 
     pub fn write(&self, buf: &mut DnsPacketBuf) -> Result<()> {
+        macro_rules! write_host_name {
+            ($host:ident) => {
+                let data_len_pos = buf.pos;
+                buf.write_u16(0)?; // temp data_len
+                buf.write_name_simple($host)?;
+
+                let data_len = buf.pos - data_len_pos - 2;
+                buf.set_u16(data_len_pos, data_len as u16)?;
+            };
+        }
+
         match *self {
             DnsRecord::A {
                 ref name,
@@ -196,10 +249,49 @@ impl DnsRecord {
                 buf.write_u16(QueryType::A.to_u16().unwrap())?;
                 buf.write_u16(1)?; // class
                 buf.write_u32(ttl)?;
-                buf.write_u16(4)?; // data_len
 
+                buf.write_u16(4)?; // data_len
                 for &o in &addr.octets() {
                     buf.write_u8(o)?;
+                }
+            }
+            DnsRecord::NS {
+                ref name,
+                ref host,
+                ttl,
+            } => {
+                buf.write_name_simple(name)?;
+                buf.write_u16(QueryType::NS.to_u16().unwrap())?;
+                buf.write_u16(1)?; // class
+                buf.write_u32(ttl)?;
+
+                write_host_name!(host);
+            }
+            DnsRecord::CNAME {
+                ref name,
+                ref host,
+                ttl,
+            } => {
+                buf.write_name_simple(name)?;
+                buf.write_u16(QueryType::CNAME.to_u16().unwrap())?;
+                buf.write_u16(1)?; // class
+                buf.write_u32(ttl)?;
+
+                write_host_name!(host);
+            }
+            DnsRecord::AAAA {
+                ref name,
+                ref addr,
+                ttl,
+            } => {
+                buf.write_name_simple(name)?;
+                buf.write_u16(QueryType::AAAA.to_u16().unwrap())?;
+                buf.write_u16(1)?; // class
+                buf.write_u32(ttl)?;
+
+                buf.write_u16(16)?; // data_len
+                for &o in &addr.segments() {
+                    buf.write_u16(o)?;
                 }
             }
             DnsRecord::Unknown { .. } => {
@@ -265,7 +357,7 @@ impl DnsPacket {
 }
 
 impl DnsPacket {
-    pub fn example(domain: &str) -> Self {
+    pub fn example(domain: &str, query_type: QueryType) -> Self {
         use rand::Rng;
 
         let header = DnsHeader {
@@ -275,7 +367,7 @@ impl DnsPacket {
         };
         let questions = vec![DnsQuestion {
             name: domain.into(),
-            query_type: QueryType::A,
+            query_type: query_type,
         }];
 
         Self {
@@ -386,7 +478,7 @@ mod test {
     fn test_write_query_packet() {
         const DOMAIN: &str = "bugenzhao.com";
 
-        let packet = DnsPacket::example(DOMAIN);
+        let packet = DnsPacket::example(DOMAIN, QueryType::A);
         let mut buf = DnsPacketBuf::new();
         packet.write(&mut buf).unwrap();
 
