@@ -110,6 +110,7 @@ arg_enum! {
         A = 1,
         NS = 2,
         CNAME = 5,
+        MX = 15,
         AAAA = 28,
     }
 }
@@ -162,6 +163,12 @@ pub enum DnsRecord {
         host: String,
         ttl: u32,
     },
+    MX {
+        name: String,
+        preference: u16,
+        host: String,
+        ttl: u32,
+    },
     AAAA {
         name: String,
         addr: Ipv6Addr,
@@ -202,6 +209,17 @@ impl DnsRecord {
 
                 Ok(DnsRecord::CNAME { name, host, ttl })
             }
+            QueryType::MX => {
+                let priority = buf.read_u16()?;
+                let host = buf.read_name()?;
+
+                Ok(DnsRecord::MX {
+                    name,
+                    preference: priority,
+                    host,
+                    ttl,
+                })
+            }
             QueryType::AAAA => {
                 let addr = Ipv6Addr::new(
                     buf.read_u16()?,
@@ -235,6 +253,15 @@ impl DnsRecord {
             ($host:ident) => {
                 let data_len_pos = buf.pos;
                 buf.write_u16(0)?; // temp data_len
+                buf.write_name_simple($host)?;
+
+                let data_len = buf.pos - data_len_pos - 2;
+                buf.set_u16(data_len_pos, data_len as u16)?;
+            };
+            ($host:ident, $preference:ident) => {
+                let data_len_pos = buf.pos;
+                buf.write_u16(0)?; // temp data_len
+                buf.write_u16($preference)?;
                 buf.write_name_simple($host)?;
 
                 let data_len = buf.pos - data_len_pos - 2;
@@ -281,6 +308,19 @@ impl DnsRecord {
                 buf.write_u32(ttl)?;
 
                 write_host_name!(host);
+            }
+            DnsRecord::MX {
+                ref name,
+                preference,
+                ref host,
+                ttl,
+            } => {
+                buf.write_name_simple(name)?;
+                buf.write_u16(QueryType::MX.to_u16().unwrap())?;
+                buf.write_u16(1)?; // class
+                buf.write_u32(ttl)?;
+
+                write_host_name!(host, preference);
             }
             DnsRecord::AAAA {
                 ref name,
@@ -392,7 +432,6 @@ mod test {
         static ref RESPONSE_BUF: DnsPacketBuf = buf!("../res/response.bin");
         static ref QUERY_BUF: DnsPacketBuf = buf!("../res/query.bin");
         static ref BUGGY_BUF: DnsPacketBuf = buf!("../res/buggy_jump.bin");
-        static ref RESPONSE_NS_BUF: DnsPacketBuf = buf!("../res/response_ns.bin");
     }
 
     #[test]
@@ -493,6 +532,11 @@ mod test {
         assert_eq!(packet_parsed.questions.first().unwrap().name, DOMAIN);
     }
 
+    lazy_static! {
+        static ref RESPONSE_NS_BUF: DnsPacketBuf = buf!("../res/response_ns.bin");
+        static ref RESPONSE_MX_BUF: DnsPacketBuf = buf!("../res/response_mx.bin");
+    }
+
     #[test]
     fn write_response_ns_packet() {
         let mut buf: DnsPacketBuf = RESPONSE_NS_BUF.clone();
@@ -507,6 +551,26 @@ mod test {
 
         assert!(match read_back_packet.answers.first() {
             Some(DnsRecord::NS { host, .. }) => host == "ns2.google.com",
+            _ => false,
+        });
+    }
+
+    #[test]
+    fn write_response_mx_packet() {
+        let mut buf: DnsPacketBuf = RESPONSE_MX_BUF.clone();
+        let packet = DnsPacket::read_from(&mut buf).unwrap();
+
+        let mut write_buf = DnsPacketBuf::new();
+        packet.write(&mut write_buf).unwrap();
+        write_buf.seek(0);
+
+        let read_back_packet = DnsPacket::read_from(&mut write_buf).unwrap();
+        println!("{:#?}", read_back_packet);
+
+        assert!(match read_back_packet.answers.first() {
+            Some(DnsRecord::MX {
+                host, preference, ..
+            }) => host == "mxbiz1.qq.com" && *preference == 5,
             _ => false,
         });
     }
