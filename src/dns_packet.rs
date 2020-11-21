@@ -108,7 +108,6 @@ pub enum DnsRecord {
 impl DnsRecord {
     pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
         let name = buf.read_name()?;
-        println!("{}", buf.pos);
         let query_type_num = buf.read_u16()?;
         let query_type =
             QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
@@ -133,8 +132,39 @@ impl DnsRecord {
     }
 }
 
-pub fn hello() {
-    println!("{:?}", DnsHeader::default());
+#[derive(Clone, Debug)]
+pub struct DnsPacket {
+    pub header: DnsHeader,
+    pub questions: Vec<DnsQuestion>,
+    pub answers: Vec<DnsRecord>,
+    pub authorities: Vec<DnsRecord>,
+    pub resources: Vec<DnsRecord>,
+}
+
+impl DnsPacket {
+    pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
+        let header = DnsHeader::read_from(buf)?;
+        let questions = (0..header.questions)
+            .map(|_| DnsQuestion::read_from(buf))
+            .collect::<Result<Vec<_>>>()?;
+        let answers = (0..header.answers)
+            .map(|_| DnsRecord::read_from(buf))
+            .collect::<Result<Vec<_>>>()?;
+        let authorities = (0..header.authoritative_entries)
+            .map(|_| DnsRecord::read_from(buf))
+            .collect::<Result<Vec<_>>>()?;
+        let resources = (0..header.resource_entries)
+            .map(|_| DnsRecord::read_from(buf))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(DnsPacket {
+            header,
+            questions,
+            answers,
+            authorities,
+            resources,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -145,6 +175,7 @@ mod test {
     lazy_static! {
         static ref RESPONSE_BUF: DnsPacketBuf = buf!("../res/response.bin");
         static ref QUERY_BUF: DnsPacketBuf = buf!("../res/query.bin");
+        static ref BUGGY_BUF: DnsPacketBuf = buf!("../res/buggy_jump.bin");
     }
 
     #[test]
@@ -202,5 +233,31 @@ mod test {
         );
 
         assert_eq!(buf.pos, origin_pos + 16);
+    }
+
+    #[test]
+    fn test_response_packet() {
+        let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
+        let packet = DnsPacket::read_from(&mut buf).unwrap();
+        println!("{:#?}", packet);
+        assert_eq!(buf.pos, 0x2f);
+    }
+
+    #[test]
+    fn test_query_packet() {
+        let mut buf: DnsPacketBuf = QUERY_BUF.clone();
+        let packet = DnsPacket::read_from(&mut buf).unwrap();
+        println!("{:#?}", packet);
+        assert_eq!(buf.pos, 0x1f);
+    }
+
+    #[test]
+    fn test_buggy_packet() {
+        let mut buf: DnsPacketBuf = BUGGY_BUF.clone();
+        let packet_result = DnsPacket::read_from(&mut buf);
+        assert!(match packet_result.unwrap_err() {
+            Error::TooManyJumps(_) => true,
+            _ => false,
+        })
     }
 }
