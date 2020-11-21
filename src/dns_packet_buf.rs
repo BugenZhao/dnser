@@ -180,7 +180,7 @@ mod test {
     static NAME: &str = "416.bugen.dev";
 
     #[test]
-    fn test_read_name_without_jump() {
+    fn read_name_without_jump() {
         let mut buf = RESPONSE_BUF.clone();
         let origin_pos = 12;
         buf.pos = origin_pos;
@@ -189,7 +189,7 @@ mod test {
     }
 
     #[test]
-    fn test_read_name_with_simple_jump() {
+    fn read_name_with_simple_jump() {
         let mut buf = RESPONSE_BUF.clone();
         let origin_pos = 0x1f;
         buf.pos = origin_pos;
@@ -198,7 +198,7 @@ mod test {
     }
 
     #[test]
-    fn test_read_name_with_buggy_jump() {
+    fn read_name_with_buggy_jump() {
         let mut buf: DnsPacketBuf = BUGGY_BUF.clone();
         let origin_pos = 0x1f;
         buf.pos = origin_pos;

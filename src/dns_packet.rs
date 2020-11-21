@@ -396,7 +396,7 @@ mod test {
     }
 
     #[test]
-    fn test_response_header() {
+    fn read_response_header() {
         let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
         let header = DnsHeader::read_from(&mut buf).unwrap();
         println!("{:?}", header);
@@ -405,7 +405,7 @@ mod test {
     }
 
     #[test]
-    fn test_query_header() {
+    fn read_query_header() {
         let mut buf: DnsPacketBuf = QUERY_BUF.clone();
         let header = DnsHeader::read_from(&mut buf).unwrap();
         println!("{:?}", header);
@@ -414,7 +414,7 @@ mod test {
     }
 
     #[test]
-    fn test_response_question() {
+    fn read_response_question() {
         let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
         let origin_pos = 12;
         buf.pos = origin_pos;
@@ -433,7 +433,7 @@ mod test {
     }
 
     #[test]
-    fn test_response_answer() {
+    fn read_response_answer() {
         let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
         let origin_pos = 0x1f;
         buf.pos = origin_pos;
@@ -453,7 +453,7 @@ mod test {
     }
 
     #[test]
-    fn test_response_packet() {
+    fn read_response_packet() {
         let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
         let packet = DnsPacket::read_from(&mut buf).unwrap();
         println!("{:#?}", packet);
@@ -461,7 +461,7 @@ mod test {
     }
 
     #[test]
-    fn test_query_packet() {
+    fn read_query_packet() {
         let mut buf: DnsPacketBuf = QUERY_BUF.clone();
         let packet = DnsPacket::read_from(&mut buf).unwrap();
         println!("{:#?}", packet);
@@ -469,7 +469,7 @@ mod test {
     }
 
     #[test]
-    fn test_buggy_packet() {
+    fn read_buggy_packet() {
         let mut buf: DnsPacketBuf = BUGGY_BUF.clone();
         let packet_result = DnsPacket::read_from(&mut buf);
         assert!(match packet_result.unwrap_err() {
@@ -479,7 +479,7 @@ mod test {
     }
 
     #[test]
-    fn test_write_query_packet() {
+    fn write_query_packet() {
         const DOMAIN: &str = "bugenzhao.com";
 
         let packet = DnsPacket::example(DOMAIN, QueryType::A);
@@ -494,7 +494,7 @@ mod test {
     }
 
     #[test]
-    fn test_write_response_ns_packet() {
+    fn write_response_ns_packet() {
         let mut buf: DnsPacketBuf = RESPONSE_NS_BUF.clone();
         let packet = DnsPacket::read_from(&mut buf).unwrap();
 
