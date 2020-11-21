@@ -104,6 +104,7 @@ impl DnsHeader {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
 pub enum QueryType {
+    Unknown = 0,
     A = 1,
 }
 
@@ -117,8 +118,9 @@ impl DnsQuestion {
     pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
         let name = buf.read_name()?;
         let query_type_num = buf.read_u16()?;
-        let query_type =
-            QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
+        let query_type = QueryType::from_u16(query_type_num)
+            .or(Some(QueryType::Unknown))
+            .unwrap();
         let _class = buf.read_u16()?;
         Ok(DnsQuestion { name, query_type })
     }
@@ -133,6 +135,12 @@ impl DnsQuestion {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum DnsRecord {
+    Unknown {
+        name: String,
+        query_type: QueryType,
+        data_len: u16,
+        ttl: u32,
+    },
     A {
         name: String,
         addr: Ipv4Addr,
@@ -144,11 +152,12 @@ impl DnsRecord {
     pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
         let name = buf.read_name()?;
         let query_type_num = buf.read_u16()?;
-        let query_type =
-            QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
+        let query_type = QueryType::from_u16(query_type_num)
+            .or(Some(QueryType::Unknown))
+            .unwrap();
         let _class = buf.read_u16()?;
         let ttl = buf.read_u32()?;
-        let _data_len = buf.read_u16()?;
+        let data_len = buf.read_u16()?;
 
         #[allow(unreachable_patterns)]
         match query_type {
@@ -161,6 +170,16 @@ impl DnsRecord {
                 );
 
                 Ok(DnsRecord::A { name, addr, ttl })
+            }
+            QueryType::Unknown => {
+                buf.step(data_len as usize);
+
+                Ok(DnsRecord::Unknown {
+                    name,
+                    query_type,
+                    data_len,
+                    ttl,
+                })
             }
             _ => Err(Error::UnimplementedQueryType(query_type)),
         }
@@ -182,10 +201,13 @@ impl DnsRecord {
                 for &o in &addr.octets() {
                     buf.write_u8(o)?;
                 }
-
-                Ok(())
+            }
+            DnsRecord::Unknown { .. } => {
+                println!("ignore unknown record: {:?}", self);
             }
         }
+
+        Ok(())
     }
 }
 
