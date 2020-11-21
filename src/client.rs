@@ -5,7 +5,7 @@ use tokio::net::UdpSocket;
 use crate::error::Result;
 
 pub async fn lookup(domain: &str, query_type: QueryType, server: &str) -> Result<DnsPacket> {
-    let mut socket = UdpSocket::bind(("0.0.0.0", 0)).await?;
+    let socket = UdpSocket::bind(("0.0.0.0", 0)).await?;
     socket.connect(server).await?; // into NetworkError
 
     let packet = DnsPacket::example(domain, query_type);

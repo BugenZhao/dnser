@@ -65,7 +65,7 @@ async fn prepare_query(socket: Arc<UdpSocket>, forward_server: Arc<String>) -> R
     let (_, from_addr) = socket.recv_from(&mut query_buf.buf).await?;
 
     tokio::spawn(async move {
-        if let Err(err) = handle_query(socket.clone(), query_buf, from_addr, forward_server).await {
+        if let Err(err) = handle_query(socket, query_buf, from_addr, forward_server).await {
             println!("error {}", err);
         }
     });
