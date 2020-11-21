@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use crate::error::{Error, Result};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -72,6 +74,65 @@ impl DnsHeader {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
+pub enum QueryType {
+    A = 1,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct DnsQuestion {
+    pub name: String,
+    pub query_type: QueryType,
+}
+
+impl DnsQuestion {
+    pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
+        let name = buf.read_name()?;
+        let query_type_num = buf.read_u16()?;
+        let query_type =
+            QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
+        let _class = buf.read_u16()?;
+        Ok(DnsQuestion { name, query_type })
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum DnsRecord {
+    A {
+        name: String,
+        addr: Ipv4Addr,
+        ttl: u32,
+    },
+}
+
+impl DnsRecord {
+    pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
+        let name = buf.read_name()?;
+        println!("{}", buf.pos);
+        let query_type_num = buf.read_u16()?;
+        let query_type =
+            QueryType::from_u16(query_type_num).ok_or(Error::InvalidQueryType(query_type_num))?;
+        let _ = buf.read_u16()?;
+        let ttl = buf.read_u32()?;
+        let _data_len = buf.read_u16()?;
+
+        #[allow(unreachable_patterns)]
+        match query_type {
+            QueryType::A => {
+                let addr = Ipv4Addr::new(
+                    buf.read_u8()?,
+                    buf.read_u8()?,
+                    buf.read_u8()?,
+                    buf.read_u8()?,
+                );
+
+                Ok(DnsRecord::A { name, addr, ttl })
+            }
+            _ => Err(Error::UnimplementedQueryType(query_type)),
+        }
+    }
+}
+
 pub fn hello() {
     println!("{:?}", DnsHeader::default());
 }
@@ -92,6 +153,7 @@ mod test {
         let header = DnsHeader::read_from(&mut buf).unwrap();
         println!("{:?}", header);
         assert!(header.response);
+        assert_eq!(buf.pos, 12);
     }
 
     #[test]
@@ -100,5 +162,45 @@ mod test {
         let header = DnsHeader::read_from(&mut buf).unwrap();
         println!("{:?}", header);
         assert_eq!(header.response, false);
+        assert_eq!(buf.pos, 12);
+    }
+
+    #[test]
+    fn test_response_question() {
+        let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
+        let origin_pos = 12;
+        buf.pos = origin_pos;
+
+        let question = DnsQuestion::read_from(&mut buf).unwrap();
+        println!("{:?}", question);
+        assert_eq!(
+            question,
+            DnsQuestion {
+                name: "416.bugen.dev".into(),
+                query_type: QueryType::A,
+            }
+        );
+
+        assert_eq!(buf.pos, origin_pos + 19);
+    }
+
+    #[test]
+    fn test_response_answer() {
+        let mut buf: DnsPacketBuf = RESPONSE_BUF.clone();
+        let origin_pos = 0x1f;
+        buf.pos = origin_pos;
+
+        let record = DnsRecord::read_from(&mut buf).unwrap();
+        println!("{:?}", record);
+        assert_eq!(
+            record,
+            DnsRecord::A {
+                name: "416.bugen.dev".into(),
+                ttl: 300,
+                addr: "59.78.37.159".parse().unwrap()
+            }
+        );
+
+        assert_eq!(buf.pos, origin_pos + 16);
     }
 }

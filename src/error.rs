@@ -10,4 +10,8 @@ pub enum Error {
     TooManyJumps(usize),
     #[error("invalid result code `{0}`")]
     InvalidResultCode(u8),
+    #[error("invalid query type `{0}`")]
+    InvalidQueryType(u16),
+    #[error("unimplemented query type `{0:?}`")]
+    UnimplementedQueryType(crate::dns_packet::QueryType),
 }
