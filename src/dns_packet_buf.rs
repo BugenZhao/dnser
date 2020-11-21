@@ -115,7 +115,7 @@ impl DnsPacketBuf {
 
     pub fn set_u16(&mut self, pos: usize, v: u16) -> Result<()> {
         self.set_u8(pos, (v >> 8) as u8)?;
-        self.set_u8(pos, (v & 0xff) as u8)?;
+        self.set_u8(pos + 1, (v & 0xff) as u8)?;
         Ok(())
     }
 
