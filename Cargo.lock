@@ -57,6 +57,7 @@ dependencies = [
 name = "dnser"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "hex",
  "lazy_static",
  "num-derive",

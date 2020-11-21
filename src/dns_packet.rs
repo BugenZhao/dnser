@@ -1,6 +1,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use crate::error::{Error, Result};
+use clap::arg_enum;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 
@@ -102,13 +103,15 @@ impl DnsHeader {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
-pub enum QueryType {
-    Unknown = 0,
-    A = 1,
-    NS = 2,
-    CNAME = 5,
-    AAAA = 28,
+arg_enum! {
+    #[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
+    pub enum QueryType {
+        Unknown = 0,
+        A = 1,
+        NS = 2,
+        CNAME = 5,
+        AAAA = 28,
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

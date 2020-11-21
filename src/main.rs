@@ -10,7 +10,7 @@ mod dns_packet_buf;
 mod error;
 mod utils;
 
-use dns_packet::DnsPacket;
+use dns_packet::{DnsPacket, QueryType};
 use dns_packet_buf::DnsPacketBuf;
 use std::net::UdpSocket;
 use structopt::StructOpt;
@@ -18,10 +18,12 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "dnser", about = "A DNS utility by Bugen.")]
 struct Opt {
-    #[structopt(short, long, default_value = "bugen.dev")]
+    #[structopt(default_value = "bugen.dev")]
     domain: String,
     #[structopt(short, long, default_value = "223.5.5.5:53")]
     server: String,
+    #[structopt(short, long, possible_values = &QueryType::variants(), case_insensitive = true, default_value = "A")]
+    r#type: QueryType,
 }
 
 fn main() {
@@ -29,7 +31,7 @@ fn main() {
     let socket = UdpSocket::bind(("0.0.0.0", 0)).unwrap();
     socket.connect(&opt.server).unwrap();
 
-    let packet = DnsPacket::example(&opt.domain, dns_packet::QueryType::NS);
+    let packet = DnsPacket::example(&opt.domain, opt.r#type);
     let mut send_buf = DnsPacketBuf::new();
     packet.write(&mut send_buf).unwrap();
     socket.send(&send_buf.buf[0..send_buf.pos]).unwrap();
