@@ -1,12 +1,23 @@
 name: dnser
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   test:
+    name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: icepuma/rust-action@master
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          args: cargo test
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test

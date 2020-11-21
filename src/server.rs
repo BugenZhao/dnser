@@ -1,13 +1,17 @@
 use crate::client::lookup;
 use crate::dns_packet::{DnsHeader, DnsPacket, ResultCode};
 use crate::dns_packet_buf::DnsPacketBuf;
+use std::sync::Arc;
 use tokio::net::UdpSocket;
 
 use crate::error::Result;
 
-async fn handle_query(socket: &mut UdpSocket, forward_server: &str) -> Result<()> {
-    let mut query_buf = DnsPacketBuf::new();
-    let (_, from_addr) = socket.recv_from(&mut query_buf.buf).await?;
+async fn handle_query(
+    socket: Arc<UdpSocket>,
+    mut query_buf: DnsPacketBuf,
+    from_addr: std::net::SocketAddr,
+    forward_server: Arc<String>,
+) -> Result<()> {
     let mut query_packet = DnsPacket::read_from(&mut query_buf)?;
 
     let mut response_packet = DnsPacket {
@@ -22,25 +26,27 @@ async fn handle_query(socket: &mut UdpSocket, forward_server: &str) -> Result<()
 
     // assuming exactly 1 question
     match query_packet.questions.pop() {
-        Some(question) => match lookup(&question.name, question.query_type, forward_server).await {
-            Ok(packet) => {
-                let r = &mut response_packet;
+        Some(question) => {
+            match lookup(&question.name, question.query_type, &forward_server).await {
+                Ok(packet) => {
+                    let r = &mut response_packet;
 
-                r.questions.push(question);
-                r.header.questions = 1;
-                r.header.rescode = packet.header.rescode;
+                    r.questions.push(question);
+                    r.header.questions = 1;
+                    r.header.rescode = packet.header.rescode;
 
-                r.answers = packet.answers;
-                r.header.answers = r.answers.len() as u16;
+                    r.answers = packet.answers;
+                    r.header.answers = r.answers.len() as u16;
 
-                r.authorities = packet.authorities;
-                r.header.authoritative_entries = r.authorities.len() as u16;
+                    r.authorities = packet.authorities;
+                    r.header.authoritative_entries = r.authorities.len() as u16;
 
-                r.resources = packet.resources;
-                r.header.resource_entries = r.resources.len() as u16;
+                    r.resources = packet.resources;
+                    r.header.resource_entries = r.resources.len() as u16;
+                }
+                _ => response_packet.header.rescode = ResultCode::SERVFAIL,
             }
-            _ => response_packet.header.rescode = ResultCode::SERVFAIL,
-        },
+        }
         None => response_packet.header.rescode = ResultCode::FORMERR,
     }
 
@@ -54,11 +60,25 @@ async fn handle_query(socket: &mut UdpSocket, forward_server: &str) -> Result<()
     Ok(())
 }
 
+async fn prepare_query(socket: Arc<UdpSocket>, forward_server: Arc<String>) -> Result<()> {
+    let mut query_buf = DnsPacketBuf::new();
+    let (_, from_addr) = socket.recv_from(&mut query_buf.buf).await?;
+
+    tokio::spawn(async move {
+        if let Err(err) = handle_query(socket, query_buf, from_addr, forward_server).await {
+            println!("error {}", err);
+        }
+    });
+
+    Ok(())
+}
+
 pub async fn run(forward_server: &str, port: u16) -> Result<()> {
-    let mut server_socket = UdpSocket::bind(("0.0.0.0", port)).await?;
+    let server_socket = Arc::new(UdpSocket::bind(("0.0.0.0", port)).await?);
+    let forward_server = Arc::new(forward_server.to_owned());
     println!("Running on :{}", port);
     loop {
-        match handle_query(&mut server_socket, forward_server).await {
+        match prepare_query(server_socket.clone(), forward_server.clone()).await {
             Ok(_) => {}
             Err(e) => {
                 println!("error {}", e);
