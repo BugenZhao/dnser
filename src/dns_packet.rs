@@ -43,7 +43,6 @@ impl Default for DnsHeader {
     fn default() -> Self {
         Self {
             recursion_desired: true,
-            authed_data: true,
             ..unsafe { std::mem::zeroed() }
         }
     }
@@ -353,6 +352,18 @@ pub struct DnsPacket {
     pub answers: Vec<DnsRecord>,
     pub authorities: Vec<DnsRecord>,
     pub resources: Vec<DnsRecord>,
+}
+
+impl Default for DnsPacket {
+    fn default() -> Self {
+        DnsPacket {
+            header: DnsHeader::default(),
+            questions: Vec::new(),
+            answers: Vec::new(),
+            authorities: Vec::new(),
+            resources: Vec::new(),
+        }
+    }
 }
 
 impl DnsPacket {

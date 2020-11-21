@@ -16,4 +16,6 @@ pub enum Error {
     UnimplementedQueryType(crate::dns_packet::QueryType),
     #[error("label `{0}` exceeds the length limitation")]
     LabelLengthExceeded(String),
+    #[error("network error: {0}")]
+    NetworkError(#[from] std::io::Error), // thus io::Error can implicitly `into` NetworkError
 }

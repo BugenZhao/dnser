@@ -28,5 +28,6 @@ struct Opt {
 
 fn main() {
     let opt: Opt = Opt::from_args();
-    client::lookup(&opt.domain, opt.r#type, &opt.server).unwrap();
+    // client::lookup(&opt.domain, opt.r#type, &opt.server).unwrap();
+    server::run(&opt.server, 55553).unwrap();
 }
