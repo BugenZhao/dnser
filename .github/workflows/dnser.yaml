@@ -26,4 +26,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: -- lookup -s 8.8.8.8:53 bugen.dev
+          args: -- lookup -s 8.8.8.8 bugen.dev

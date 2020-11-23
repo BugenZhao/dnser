@@ -25,7 +25,7 @@ use structopt::StructOpt;
 enum Dnser {
     Lookup {
         #[structopt(short, long, default_value = "198.41.0.4")]
-        root: String,
+        server: String,
         #[structopt(short, long, possible_values = &QueryType::variants(), case_insensitive = true, default_value = "A")]
         r#type: QueryType,
         #[structopt()]
@@ -45,11 +45,11 @@ enum Dnser {
 async fn main() {
     match Dnser::from_args() {
         Dnser::Lookup {
-            root,
+            server,
             r#type,
             domain,
         } => {
-            client::recursive_lookup(&domain, r#type, (root.parse().unwrap(), 53), 0)
+            client::recursive_lookup(&domain, r#type, (server.parse().unwrap(), 53), 0)
                 .await
                 .unwrap();
         }
