@@ -9,6 +9,10 @@ A DNS utility written in Rust, just for learning the networking & the rust-lang.
 - [x] DNS client
 - [ ] DNS server
     - [x] proxy
-    - [ ] recursive resolver
+    - [x] recursive resolver
+    - [ ] cache
 - [x] Concurrency
     - [x] async
+
+## Reference
+- [EmilHernvall/dnsguide](https://github.com/EmilHernvall/dnsguide)
