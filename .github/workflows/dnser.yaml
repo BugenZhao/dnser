@@ -21,9 +21,15 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-      
+
       - name: Run client
         uses: actions-rs/cargo@v1
         with:
           command: run
           args: -- lookup -s 8.8.8.8 bugen.dev
+
+      - name: Run server
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: -- server && dig @127.0.0.1 -p 55553 bugen.dev -t a
