@@ -5,12 +5,14 @@ extern crate lazy_static;
 #[cfg_attr(dns_packet, macro_use)]
 extern crate num_derive;
 
+extern crate async_recursion;
 extern crate tokio;
 
 mod client;
 mod dns_packet;
 mod dns_packet_buf;
 mod error;
+mod recursive;
 mod server;
 mod utils;
 
@@ -22,7 +24,7 @@ use structopt::StructOpt;
 #[structopt(name = "dnser", about = "A DNS utility by Bugen.")]
 enum Dnser {
     Lookup {
-        #[structopt(short, long, default_value = "223.5.5.5:53")]
+        #[structopt(short, long, default_value = "223.5.5.5")]
         server: String,
         #[structopt(short, long, possible_values = &QueryType::variants(), case_insensitive = true, default_value = "A")]
         r#type: QueryType,
@@ -50,10 +52,14 @@ async fn main() {
             r#type,
             domain,
         } => {
-            client::lookup(&domain, r#type, &server).await.unwrap();
+            client::recursive_lookup(&domain, r#type, ("198.41.0.4".parse().unwrap(), 53), 0)
+                .await
+                .unwrap();
         }
         Dnser::Server { server, port } => {
-            server::run(server, port).await.unwrap();
+            server::run((server.parse().unwrap(), 53), port)
+                .await
+                .unwrap();
         }
     }
 }

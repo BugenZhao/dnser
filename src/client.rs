@@ -1,10 +1,16 @@
-use crate::dns_packet::{DnsPacket, QueryType};
+use crate::dns_packet::{DnsPacket, DnsRecord, QueryType, ResultCode};
 use crate::dns_packet_buf::DnsPacketBuf;
 use tokio::net::UdpSocket;
 
-use crate::error::Result;
+use std::net::Ipv4Addr;
 
-pub async fn lookup(domain: &str, query_type: QueryType, server: &str) -> Result<DnsPacket> {
+use crate::error::{Error, Result};
+
+pub async fn lookup(
+    domain: &str,
+    query_type: QueryType,
+    server: (Ipv4Addr, u16),
+) -> Result<DnsPacket> {
     let socket = UdpSocket::bind(("0.0.0.0", 0)).await?;
     socket.connect(server).await?; // into NetworkError
 
@@ -23,4 +29,56 @@ pub async fn lookup(domain: &str, query_type: QueryType, server: &str) -> Result
     );
 
     Ok(response_packet)
+}
+
+#[async_recursion::async_recursion]
+pub async fn recursive_lookup(
+    domain: &str,
+    query_type: QueryType,
+    root_server: (Ipv4Addr, u16),
+    depth: u8,
+) -> Result<DnsPacket> {
+    if depth > 10 {
+        return Err(Error::TooManyRecursion(domain.to_owned()));
+    }
+
+    let mut ns = root_server.to_owned();
+    'outer: loop {
+        let response = lookup(domain, query_type, ns).await?;
+        match response.header.rescode {
+            ResultCode::NXDOMAIN => {
+                return Ok(response);
+            }
+            ResultCode::NOERROR if !response.answers.is_empty() => {
+                return Ok(response);
+            }
+            _ => {
+                let nss = response.get_authority_ns(domain);
+                // no ns provided
+                if nss.is_empty() {
+                    return Ok(response);
+                }
+                // try resolving any ns
+                for ns_record in nss.iter() {
+                    if let Some(ns_addr) = response.resolve_in_resources(&ns_record.ns_host) {
+                        ns = (*ns_addr, 53);
+                        continue 'outer;
+                    }
+                }
+                // all ns unresolved, lookup ns
+                let recursive_response = recursive_lookup(
+                    &nss.first().unwrap().ns_host,
+                    QueryType::A,
+                    root_server,
+                    depth + 1,
+                )
+                .await?;
+                // try using recursive ns addr
+                if let Some(DnsRecord::A { addr, .. }) = recursive_response.answers.first() {
+                    ns = (*addr, 53);
+                    continue 'outer;
+                }
+            }
+        }
+    }
 }

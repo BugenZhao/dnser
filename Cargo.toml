@@ -16,3 +16,4 @@ rand = "*"
 structopt = "*"
 clap = "*"
 tokio = { version = "0.3", features = ["full"] }
+async-recursion = "0.2"
