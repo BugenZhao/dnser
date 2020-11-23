@@ -141,12 +141,6 @@ impl DnsQuestion {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum DnsRecord {
-    Unknown {
-        query_type_num: u16,
-        name: String,
-        data_len: u16,
-        ttl: u32,
-    },
     A {
         name: String,
         addr: Ipv4Addr,
@@ -186,7 +180,6 @@ impl DnsRecord {
         let ttl = buf.read_u32()?;
         let data_len = buf.read_u16()?;
 
-        #[allow(unreachable_patterns)]
         match query_type {
             QueryType::A => {
                 let addr = Ipv4Addr::new(
@@ -209,12 +202,12 @@ impl DnsRecord {
                 Ok(DnsRecord::CNAME { name, host, ttl })
             }
             QueryType::MX => {
-                let priority = buf.read_u16()?;
+                let preference = buf.read_u16()?;
                 let host = buf.read_name()?;
 
                 Ok(DnsRecord::MX {
                     name,
-                    preference: priority,
+                    preference,
                     host,
                     ttl,
                 })
@@ -233,17 +226,16 @@ impl DnsRecord {
 
                 Ok(DnsRecord::AAAA { name, addr, ttl })
             }
-            QueryType::Unknown => {
+            _ => {
                 buf.step(data_len as usize);
-
-                Ok(DnsRecord::Unknown {
+                
+                Err(Error::UnknownQuery {
                     query_type_num,
                     name,
                     data_len,
                     ttl,
                 })
             }
-            _ => Err(Error::UnimplementedQueryType(query_type)),
         }
     }
 
@@ -336,9 +328,6 @@ impl DnsRecord {
                     buf.write_u16(o)?;
                 }
             }
-            DnsRecord::Unknown { .. } => {
-                println!("ignore unknown record: {:?}", self);
-            }
         }
 
         Ok(())
@@ -368,22 +357,40 @@ impl Default for DnsPacket {
 
 impl DnsPacket {
     pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
+        macro_rules! ok_and_warn {
+            ($type:ident) => {
+                |_| match $type::read_from(buf) {
+                    Ok(r) => Some(r),
+                    Err(e) => {
+                        println!("error in parsing: {}", e);
+                        None
+                    }
+                }
+            };
+        };
+
         let header = DnsHeader::read_from(buf)?;
-        let questions = (0..header.questions)
-            .map(|_| DnsQuestion::read_from(buf))
-            .collect::<Result<Vec<_>>>()?;
-        let answers = (0..header.answers)
-            .map(|_| DnsRecord::read_from(buf))
-            .collect::<Result<Vec<_>>>()?;
-        let authorities = (0..header.authoritative_entries)
-            .map(|_| DnsRecord::read_from(buf))
-            .collect::<Result<Vec<_>>>()?;
-        let resources = (0..header.resource_entries)
-            .map(|_| DnsRecord::read_from(buf))
-            .collect::<Result<Vec<_>>>()?;
+        let questions: Vec<_> = (0..header.questions)
+            .filter_map(ok_and_warn!(DnsQuestion))
+            .collect();
+        let answers: Vec<_> = (0..header.answers)
+            .filter_map(ok_and_warn!(DnsRecord))
+            .collect();
+        let authorities: Vec<_> = (0..header.authoritative_entries)
+            .filter_map(ok_and_warn!(DnsRecord))
+            .collect();
+        let resources: Vec<_> = (0..header.resource_entries)
+            .filter_map(ok_and_warn!(DnsRecord))
+            .collect();
 
         Ok(DnsPacket {
-            header,
+            header: DnsHeader {
+                questions: questions.len() as u16,
+                answers: answers.len() as u16,
+                authoritative_entries: authorities.len() as u16,
+                resource_entries: resources.len() as u16,
+                ..header
+            },
             questions,
             answers,
             authorities,
