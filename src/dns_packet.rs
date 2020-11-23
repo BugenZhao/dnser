@@ -228,7 +228,7 @@ impl DnsRecord {
             }
             _ => {
                 buf.step(data_len as usize);
-                
+
                 Err(Error::UnknownQuery {
                     query_type_num,
                     name,
@@ -357,31 +357,32 @@ impl Default for DnsPacket {
 
 impl DnsPacket {
     pub fn read_from(buf: &mut DnsPacketBuf) -> Result<Self> {
-        macro_rules! ok_and_warn {
-            ($type:ident) => {
-                |_| match $type::read_from(buf) {
-                    Ok(r) => Some(r),
-                    Err(e) => {
-                        println!("error in parsing: {}", e);
-                        None
+        macro_rules! fill {
+            ($type:ident, $count:expr) => {{
+                let mut results = Vec::new();
+                for _ in 0..($count) {
+                    let result = $type::read_from(buf);
+                    match result {
+                        Ok(r) => results.push(r),
+                        Err(e @ Error::UnknownQuery { .. }) => {
+                            // ignore this error
+                            println!("unknown query in parsing: {}", e);
+                        }
+                        Err(e) => {
+                            // critical
+                            return Err(e);
+                        }
                     }
                 }
-            };
+                results
+            }};
         };
 
         let header = DnsHeader::read_from(buf)?;
-        let questions: Vec<_> = (0..header.questions)
-            .filter_map(ok_and_warn!(DnsQuestion))
-            .collect();
-        let answers: Vec<_> = (0..header.answers)
-            .filter_map(ok_and_warn!(DnsRecord))
-            .collect();
-        let authorities: Vec<_> = (0..header.authoritative_entries)
-            .filter_map(ok_and_warn!(DnsRecord))
-            .collect();
-        let resources: Vec<_> = (0..header.resource_entries)
-            .filter_map(ok_and_warn!(DnsRecord))
-            .collect();
+        let questions = fill!(DnsQuestion, header.questions);
+        let answers = fill!(DnsRecord, header.answers);
+        let authorities = fill!(DnsRecord, header.authoritative_entries);
+        let resources = fill!(DnsRecord, header.resource_entries);
 
         Ok(DnsPacket {
             header: DnsHeader {
