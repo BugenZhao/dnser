@@ -1,4 +1,6 @@
 # dnser
+![dnser](https://github.com/BugenZhao/dnser/workflows/dnser/badge.svg)
+![docs](https://github.com/BugenZhao/dnser/workflows/docs/badge.svg)
 
 A DNS utility written in Rust, just for learning the networking & the rust-lang.
 

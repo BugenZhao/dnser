@@ -1,0 +1,32 @@
+name: docs
+
+on: push
+
+jobs:
+  docs:
+    name: Generate docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo doc
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTDOCFLAGS: --enable-index-page -Zunstable-options
+        with:
+          command: doc
+          args: --no-deps --document-private-items
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/doc/
