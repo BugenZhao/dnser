@@ -1,6 +1,7 @@
 use crate::client::{lookup, recursive_lookup};
 use crate::dns_packet::{DnsHeader, DnsPacket, ResultCode};
 use crate::dns_packet_buf::DnsPacketBuf;
+use log::*;
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::net::UdpSocket;
 
@@ -63,7 +64,7 @@ async fn handle_query(
 
     let bytes = response_buf.peek_range(0, response_buf.pos)?;
     socket.send_to(bytes, from_addr).await?;
-    println!("Sent response to {}: {:#?}", from_addr, response_packet);
+    info!("Sent response to {}: {:#?}", from_addr, response_packet);
 
     Ok(())
 }
@@ -77,8 +78,8 @@ async fn prepare_query(
     let (_, from_addr) = socket.recv_from(&mut query_buf.buf).await?;
 
     tokio::spawn(async move {
-        if let Err(err) = handle_query(socket, query_buf, from_addr, remote_server, proxy).await {
-            println!("error {}", err);
+        if let Err(e) = handle_query(socket, query_buf, from_addr, remote_server, proxy).await {
+            error!("error {}", e);
         }
     });
 
@@ -93,7 +94,7 @@ pub async fn run(remote_server: (Ipv4Addr, u16), listen_port: u16, proxy: bool) 
         match prepare_query(server_socket.clone(), remote_server, proxy).await {
             Ok(_) => {}
             Err(e) => {
-                println!("error {}", e);
+                error!("error {}", e);
             }
         };
     }

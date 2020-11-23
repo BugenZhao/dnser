@@ -1,11 +1,12 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
-
-use crate::error::{Error, Result};
 use clap::arg_enum;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+use log::*;
 
 use crate::dns_packet_buf::DnsPacketBuf;
+use crate::error::{Error, Result};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, FromPrimitive, ToPrimitive)]
 pub enum ResultCode {
@@ -366,7 +367,7 @@ impl DnsPacket {
                         Ok(r) => results.push(r),
                         Err(e @ Error::UnknownQuery { .. }) => {
                             // ignore this error
-                            println!("unknown query in parsing: {}", e);
+                            warn!("unknown query in parsing: {}", e);
                         }
                         Err(e) => {
                             // critical

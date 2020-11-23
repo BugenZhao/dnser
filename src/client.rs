@@ -3,6 +3,7 @@ use crate::dns_packet_buf::DnsPacketBuf;
 use crate::error::{Error, Result};
 
 use async_recursion::async_recursion;
+use log::*;
 use tokio::net::UdpSocket;
 
 use std::net::Ipv4Addr;
@@ -24,7 +25,7 @@ pub async fn lookup(
     let (_, response_server) = socket.recv_from(&mut recv_buf.buf).await?;
     let response_packet = DnsPacket::read_from(&mut recv_buf)?;
 
-    println!(
+    info!(
         "Received answer for {} from {} => {:#?}",
         domain, response_server, response_packet
     );

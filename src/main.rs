@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
+extern crate async_recursion;
+extern crate env_logger;
 #[cfg_attr(test, macro_use)]
 extern crate lazy_static;
 #[cfg_attr(dns_packet, macro_use)]
 extern crate num_derive;
-
-extern crate async_recursion;
 extern crate tokio;
 
 mod client;
@@ -43,15 +43,21 @@ enum Dnser {
 
 #[tokio::main]
 async fn main() {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .init();
+
     match Dnser::from_args() {
         Dnser::Lookup {
             server,
             r#type,
             domain,
         } => {
-            client::recursive_lookup(&domain, r#type, (server.parse().unwrap(), 53), 0)
-                .await
-                .unwrap();
+            let answer =
+                client::recursive_lookup(&domain, r#type, (server.parse().unwrap(), 53), 0)
+                    .await
+                    .unwrap();
+            println!("{:?}", answer.answers);
         }
         Dnser::Server {
             server,
