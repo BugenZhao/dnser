@@ -24,21 +24,18 @@ use structopt::StructOpt;
 #[structopt(name = "dnser", about = "A DNS utility by Bugen.")]
 enum Dnser {
     Lookup {
-        #[structopt(short, long, default_value = "223.5.5.5")]
-        server: String,
+        #[structopt(short, long, default_value = "198.41.0.4")]
+        root: String,
         #[structopt(short, long, possible_values = &QueryType::variants(), case_insensitive = true, default_value = "A")]
         r#type: QueryType,
         #[structopt()]
         domain: String,
     },
     Server {
-        #[structopt(
-            short,
-            long,
-            default_value = "223.5.5.5:53",
-            help = "The DNS server to proxy"
-        )]
+        #[structopt(short, long, default_value = "198.41.0.4")]
         server: String,
+        #[structopt(long)]
+        proxy: bool,
         #[structopt(short, long, default_value = "55553")]
         port: u16,
     },
@@ -48,16 +45,20 @@ enum Dnser {
 async fn main() {
     match Dnser::from_args() {
         Dnser::Lookup {
-            server,
+            root,
             r#type,
             domain,
         } => {
-            client::recursive_lookup(&domain, r#type, ("198.41.0.4".parse().unwrap(), 53), 0)
+            client::recursive_lookup(&domain, r#type, (root.parse().unwrap(), 53), 0)
                 .await
                 .unwrap();
         }
-        Dnser::Server { server, port } => {
-            server::run((server.parse().unwrap(), 53), port)
+        Dnser::Server {
+            server,
+            port,
+            proxy,
+        } => {
+            server::run((server.parse().unwrap(), 53), port, proxy)
                 .await
                 .unwrap();
         }

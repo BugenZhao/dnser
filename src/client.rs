@@ -1,10 +1,11 @@
 use crate::dns_packet::{DnsPacket, DnsRecord, QueryType, ResultCode};
 use crate::dns_packet_buf::DnsPacketBuf;
+use crate::error::{Error, Result};
+
+use async_recursion::async_recursion;
 use tokio::net::UdpSocket;
 
 use std::net::Ipv4Addr;
-
-use crate::error::{Error, Result};
 
 pub async fn lookup(
     domain: &str,
@@ -31,7 +32,7 @@ pub async fn lookup(
     Ok(response_packet)
 }
 
-#[async_recursion::async_recursion]
+#[async_recursion]
 pub async fn recursive_lookup(
     domain: &str,
     query_type: QueryType,
