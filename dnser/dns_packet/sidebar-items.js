@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["_IMPL_NUM_FromPrimitive_FOR_QueryType",""],["_IMPL_NUM_FromPrimitive_FOR_ResultCode",""],["_IMPL_NUM_ToPrimitive_FOR_QueryType",""],["_IMPL_NUM_ToPrimitive_FOR_ResultCode",""]],"enum":[["DnsRecord",""],["QueryType",""],["ResultCode",""]],"struct":[["DnsHeader",""],["DnsPacket",""],["DnsQuestion",""]]});

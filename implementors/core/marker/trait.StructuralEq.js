@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["dnser"] = [{"text":"impl StructuralEq for ResultCode","synthetic":false,"types":[]},{"text":"impl StructuralEq for QueryType","synthetic":false,"types":[]},{"text":"impl StructuralEq for DnsQuestion","synthetic":false,"types":[]},{"text":"impl StructuralEq for DnsRecord","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

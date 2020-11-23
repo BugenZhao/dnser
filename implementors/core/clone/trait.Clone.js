@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["dnser"] = [{"text":"impl Clone for ResultCode","synthetic":false,"types":[]},{"text":"impl Clone for DnsHeader","synthetic":false,"types":[]},{"text":"impl Clone for QueryType","synthetic":false,"types":[]},{"text":"impl Clone for DnsQuestion","synthetic":false,"types":[]},{"text":"impl Clone for DnsRecord","synthetic":false,"types":[]},{"text":"impl Clone for DnsPacket","synthetic":false,"types":[]},{"text":"impl Clone for DnsPacketBuf","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
